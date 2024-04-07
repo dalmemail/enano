@@ -21,10 +21,12 @@
 
 #define ctrl(x)           ((x) & 0x1f)
 
+// TODO: Put upper and (future) lower bar in different files
 static void draw_upper_bar(WINDOW *window)
 {
         wbkgd(window, COLOR_PAIR(1));
 	// TODO: Put some error checking in this functions
+	// TODO: Check this: Bolding isn't working
 	wattron(window, A_BOLD);
         mvwprintw(window, 0, 2, "(e)nano");
 	wattroff(window, A_BOLD);
@@ -33,6 +35,9 @@ static void draw_upper_bar(WINDOW *window)
 void run_editor(char *path)
 {
 	initscr();
+	// raw() allows to use certain combinations like Control+S which
+	// otherwise would raise a signal
+	raw();
 	start_color();
 	cbreak();
 	noecho();
@@ -57,6 +62,9 @@ void run_editor(char *path)
 		switch (c) {
 			case ctrl('x'):
 				exit = 1;
+			break;
+			case ctrl('s'):
+				reusable_event.event_type = EVENT_SAVE_BUFFER;
 			break;
 			case KEY_UP:
 				reusable_event.event_type = EVENT_MOVE_CURSOR_UP;
@@ -84,5 +92,6 @@ void run_editor(char *path)
 		editor.handle_event(&editor, &reusable_event);
 		editor.refresh_(&editor);
 	}
+	editor.uninit(&editor);
 out:	endwin();
 }

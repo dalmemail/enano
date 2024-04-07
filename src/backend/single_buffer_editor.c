@@ -55,7 +55,8 @@ struct single_buffer_editor_data {
 	size_t window_pos_x0;
 	size_t window_pos_y0;
 
-	FILE *file_descriptor;
+	// path to the file that backs the buffer in disk
+	char *file_path;
 	// the real buffer we use, the file it's split into lines
 	// Linked list allows inserting lines in O(1), jumping to a line in O(n)
 	struct line_linked_list_node *lines;
@@ -355,6 +356,28 @@ static void put_character(struct single_buffer_editor_data *p, char *c)
 	}
 }
 
+// TODO: Some error handling here
+// TODO: Write files back to this in a more safer way (using a tmp file buffer)
+// to prevent any data loss
+static void save_buffer(struct single_buffer_editor_data *p, char *path)
+{
+	FILE *descriptor = fopen(path, "w");
+	if (!descriptor) {
+		return;
+	}
+
+	for (struct line_linked_list_node *it = p->lines; it != NULL; it = it->next) {
+		if (fwrite(it->line.line_str, 1, it->line.length, descriptor) != it->line.length ||
+			fwrite("\n", 1, 1, descriptor) != 1) {
+			// TODO: Handle this better
+			endwin();
+			exit(1);
+		}
+	}
+
+	fclose(descriptor);
+}
+
 //---------------------------------------------------------------------------------------//
 
 // Functions that implement the editor_object interface defined at common/interface.h
@@ -377,8 +400,8 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	p->window_ncols = ncols;
 	p->window_pos_x0 = x;
 	p->window_pos_y0 = y;
-	p->file_descriptor = fopen(path, "r");
-	if (!p->file_descriptor) {
+	FILE *file_descriptor = fopen(path, "r");
+	if (!file_descriptor) {
 		delwin(p->window);
 		return errno;
 	}
@@ -386,9 +409,18 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	struct stat st;
 	if (stat(path, &st) < 0) {
 		delwin(p->window);
-		fclose(p->file_descriptor);
+		fclose(file_descriptor);
 		return errno;
 	}
+
+	size_t path_size = strlen(path) + 1;
+	p->file_path = (char *)malloc(path_size * sizeof(char));
+	if (p->file_path == NULL) {
+		delwin(p->window);
+		fclose(file_descriptor);
+		return errno;
+	}
+	strncpy(p->file_path, path, path_size);
 
 	char *buffer;
 	size_t buffer_size;
@@ -396,24 +428,24 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	buffer = (char *)malloc(buffer_size * sizeof(char));
 	if (buffer == NULL) {
 		delwin(p->window);
-		fclose(p->file_descriptor);
+		fclose(file_descriptor);
 		return errno;
 	}
 
-	if (fread(buffer, buffer_size, 1, p->file_descriptor) != 1) {
+	if (fread(buffer, buffer_size, 1, file_descriptor) != 1) {
 		delwin(p->window);
-		fclose(p->file_descriptor);
+		fclose(file_descriptor);
 		free(buffer);
 		// TODO: put here another error code
 		// DONT RETURN -1: You have to return something in the 0..255 range
 		return -1;
 	}
+	fclose(file_descriptor);
 
 	p->n_lines = count_lines(buffer, buffer_size);
 	p->lines = (struct line_linked_list_node *)malloc(sizeof(struct line_linked_list_node));
 	if (p->lines == NULL) {
 		delwin(p->window);
-		fclose(p->file_descriptor);
 		free(buffer);
 		return errno;
 	}
@@ -440,12 +472,12 @@ static void uninit_single_buffer_editor(struct editor_object *self)
 
 	delwin(p->window);
 	struct line_linked_list_node *current_node = p->lines;
-	for (; current_node->next != NULL; current_node = current_node->next) {
+	while (current_node->next != NULL) {
 		current_node = current_node->next;
 		free_linked_list_node(current_node->prev);
 	}
 	free_linked_list_node(current_node);
-	fclose(p->file_descriptor);
+	free(p->file_path);
 }
 
 // TODO: split switch in functions
@@ -456,6 +488,7 @@ static int single_buffer_editor_handle_event(struct editor_object *self, struct 
 	char user_entered_character;
 
 	//TODO: Use a jump table here ??
+	//TODO: If not, put this in some order (alphabetical ??)
 	switch (event->event_type) {
 		case EVENT_SHOW_CURSOR:
 			show_cursor(p);
@@ -484,6 +517,9 @@ static int single_buffer_editor_handle_event(struct editor_object *self, struct 
 				insert_new_line(p);
 			else
 				put_character(p, (char *)event->additional_data);
+		break;
+		case EVENT_SAVE_BUFFER:
+			save_buffer(p, p->file_path);
 		break;
 		default:
 			return ERROR_EVENT_NOT_FOUND;
