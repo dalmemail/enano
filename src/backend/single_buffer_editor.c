@@ -487,8 +487,7 @@ static int single_buffer_editor_handle_event(struct editor_object *self, struct 
 	// TODO: Better name for this
 	char user_entered_character;
 
-	//TODO: Use a jump table here ??
-	//TODO: If not, put this in some order (alphabetical ??)
+	//TODO: Use a jump table here
 	switch (event->event_type) {
 		case EVENT_SHOW_CURSOR:
 			show_cursor(p);

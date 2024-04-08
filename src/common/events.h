@@ -46,7 +46,21 @@ struct event {
 	void *additional_data;
 };
 
-#define	EVENT_HANDLING_SUCCESS 0
-#define	ERROR_EVENT_NOT_FOUND -1
+enum {
+	EVENT_HANDLING_SUCCESS=0,
+	ERROR_EVENT_NOT_FOUND,
+	ERROR_OCCURRED_ERRNO_SET
+};
+
+// An struct result is the way the backends can return
+// a (sometimes complex) result to the caller.
+// This can be an error code, information requested by
+// an event (such as the one triggered by pressing Ctrl+C)
+// or whatever other thing
+struct result {
+	unsigned int result_type;
+	// often this will be NULL too
+	void *additional_data;
+};
 
 #endif /* ENANO_EVENTS_H */
