@@ -45,6 +45,7 @@ struct line_linked_list_node {
 	struct line_linked_list_node *prev;
 };
 
+// TODO: Change size_t for unsigned int where possible
 struct single_buffer_editor_data {
 	WINDOW *window;
 	size_t window_nlines;
@@ -90,9 +91,9 @@ static unsigned int count_lines(char *buf, size_t buf_size)
 	return ret;
 }
 
-static size_t count_tabs(char *s, size_t limit)
+static unsigned int count_tabs(char *s, unsigned int limit)
 {
-	size_t ret = 0;
+	unsigned int ret = 0;
 	for (int i = 0; i < limit; i++)
 		if (s[i] == '\t')
 			ret++;
@@ -207,6 +208,29 @@ static void concat_lines(struct line *dst, struct line *src)
 
 	strncpy(&dst->line_str[dst->length], src->line_str, src->length + 1);
 	dst->length += src->length;
+}
+
+// returns the maximum number of characters of str that fill into
+// an screen line of line_size characters
+static unsigned int str_length_to_fill_line(char *str, unsigned int line_size)
+{
+	unsigned int ret = 0;
+	while (*str && ret < line_size) {
+		if (*str != '\t' && ret + 1 <= line_size)
+			ret++;
+		else if (*str == '\t' && ret + SPACES_IN_A_TAB <= line_size)
+			ret += SPACES_IN_A_TAB;
+
+		str++;
+	}
+
+	return ret;
+}
+
+static void clean_screen_line(WINDOW *win, unsigned int y)
+{
+	wmove(win, y, 0);
+	wclrtoeol(win);
 }
 
 //----------------------------------------------------------------------------------------//
@@ -552,15 +576,59 @@ static void single_buffer_editor_refresh(struct editor_object *self)
 
 	if (top_has_changed || p->clear_window) {
 		wclear(p->window);
-		if (p->clear_window)
-			p->clear_window = 0;
+		p->clear_window = 0;
 	}
 
+	unsigned int cursor_x = 0;
+	unsigned int cursor_y = 0;
 	struct line_linked_list_node *current_line = p->top_print_line;
 	for (int i = 0; i < p->window_nlines && current_line != NULL; i++) {
-		// TODO: Take tabs in consideration when writing lines
-		mvwaddnstr(p->window, i, 0, current_line->line.line_str,
-			(current_line->line.length > p->window_ncols) ? p->window_ncols : current_line->line.length);
+		// tabs ocuppy 8 spaces in screen, so a line with less characters
+		// than the screen width (or the line size) might not fit in a line
+		char *line_str = current_line->line.line_str;
+
+		// TODO: Try to refactor this on a clearer way
+		if (p->top_print_line_y + i == p->pos_y) {
+			unsigned int n_tabs = count_tabs(line_str, p->pos_x);
+			// position of cursor on a screen with infinite columns
+			cursor_x = (p->pos_x + n_tabs*(SPACES_IN_A_TAB - 1));
+			cursor_y = p->pos_y - p->top_print_line_y;
+			if (cursor_x >= p->window_ncols) {
+				// we need to calculate the first position of the
+				// line to be displayed on the screen
+				// Ideally, this should be one j such that
+				// line_str[0...j-1] expands to max_cursor_line_new_start
+				// however, that j might not exist as we could need to split
+				// a tab (8 spaces) into two. In that case we put the tab
+				// index as the line_new_start_pos
+				unsigned int line_new_start_pos = 0;
+				unsigned int cursor_line_new_start = 0;
+				unsigned int max_cursor_line_new_start =
+					(cursor_x / p->window_ncols) * p->window_ncols;
+				while (cursor_line_new_start < max_cursor_line_new_start) {
+					if (line_str[line_new_start_pos] == '\t') {
+						if (cursor_line_new_start + SPACES_IN_A_TAB <= max_cursor_line_new_start)
+							cursor_line_new_start += SPACES_IN_A_TAB;
+						else
+							break;
+					}
+					else {
+						cursor_line_new_start++;
+					}
+					line_new_start_pos++;
+				}
+				line_str = &line_str[line_new_start_pos];
+				cursor_x -= cursor_line_new_start;
+			}
+
+			clean_screen_line(p->window, i);
+		}
+
+		unsigned int length_to_write = str_length_to_fill_line(line_str,
+			p->window_ncols);
+
+		mvwaddnstr(p->window, i, 0, line_str, length_to_write);
+		// TODO: Put > & < with background white color at the end of truncated lines
 
 		current_line = current_line->next;
 	}
@@ -568,10 +636,7 @@ static void single_buffer_editor_refresh(struct editor_object *self)
 	mvwprintw(p->window, 0, 0, "%d %d", p->pos_x, p->pos_y);
 	// TODO: Use a handmade cursor
 	if (p->show_cursor) {
-		size_t n_tabs = count_tabs(p->line_y->line.line_str, p->pos_x);
-		size_t cursor_x = (p->pos_x + n_tabs*(SPACES_IN_A_TAB - 1)) % p->window_ncols;
-		size_t cursor_y = p->pos_y - p->top_print_line_y;
-		mvwprintw(p->window, 1, 0, " %d ", cursor_y);
+		mvwprintw(p->window, 1, 0, " %d ", p->window_ncols);
 		wmove(p->window, cursor_y, cursor_x);
 	}
 

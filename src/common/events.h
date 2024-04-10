@@ -52,7 +52,7 @@ enum {
 	ERROR_OCCURRED_ERRNO_SET
 };
 
-// An struct result is the way the backends can return
+// A struct result is the way the backends can return
 // a (sometimes complex) result to the caller.
 // This can be an error code, information requested by
 // an event (such as the one triggered by pressing Ctrl+C)
