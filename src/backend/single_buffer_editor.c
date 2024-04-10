@@ -50,11 +50,6 @@ struct single_buffer_editor_data {
 	WINDOW *window;
 	size_t window_nlines;
 	size_t window_ncols;
-	// (x0, y0) is the position of the upper left corner of the window
-	// in the full screen
-	// TODO: Check if we really need this
-	size_t window_pos_x0;
-	size_t window_pos_y0;
 
 	// path to the file that backs the buffer in disk
 	char *file_path;
@@ -422,8 +417,6 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 
 	p->window_nlines = nlines;
 	p->window_ncols = ncols;
-	p->window_pos_x0 = x;
-	p->window_pos_y0 = y;
 	FILE *file_descriptor = fopen(path, "r");
 	if (!file_descriptor) {
 		delwin(p->window);
