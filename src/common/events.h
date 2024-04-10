@@ -37,7 +37,8 @@ enum {
 
 	EVENT_DELETE_KEY_ENTERED,
 	// TODO: Check if we can rid of this one
-	EVENT_VOID
+	EVENT_VOID,
+	NR_EVENTS
 };
 
 struct event {
@@ -47,6 +48,7 @@ struct event {
 };
 
 enum {
+	// TODO: Do we really need this success?
 	EVENT_HANDLING_SUCCESS=0,
 	ERROR_EVENT_NOT_FOUND,
 	ERROR_OCCURRED_ERRNO_SET

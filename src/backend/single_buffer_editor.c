@@ -399,6 +399,85 @@ static void save_buffer(struct single_buffer_editor_data *p, char *path)
 
 //---------------------------------------------------------------------------------------//
 
+// Event handling functions
+
+static void handle_event_show_cursor
+(struct single_buffer_editor_data *p, struct event *event, struct result *result)
+{
+	show_cursor(p);
+}
+
+static void handle_event_hide_cursor
+(struct single_buffer_editor_data *p, struct event *event, struct result *result)
+{
+	hide_cursor(p);
+}
+
+static void handle_event_move_cursor_left
+(struct single_buffer_editor_data *p, struct event *event, struct result *result)
+{
+	move_cursor_left(p);
+}
+
+static void handle_event_move_cursor_right
+(struct single_buffer_editor_data *p, struct event *event, struct result *result)
+{
+	move_cursor_right(p);
+}
+
+static void handle_event_move_cursor_up
+(struct single_buffer_editor_data *p, struct event *event, struct result *result)
+{
+	move_cursor_up(p);
+}
+
+static void handle_event_move_cursor_down
+(struct single_buffer_editor_data *p, struct event *event, struct result *result)
+{
+	move_cursor_down(p);
+}
+
+// TODO: Rename this function and its associated event
+static void handle_event_delete_key_entered
+(struct single_buffer_editor_data *p, struct event *event, struct result *result)
+{
+	remove_current_character(p);
+}
+
+static void handle_event_character_entered
+(struct single_buffer_editor_data *p, struct event *event, struct result *result)
+{
+	// TODO: Better name for this
+	char user_entered_character = *((char *)event->additional_data);
+	if (user_entered_character == '\n')
+		insert_new_line(p);
+        else
+		put_character(p, (char *)event->additional_data);
+}
+
+static void handle_event_save_buffer
+(struct single_buffer_editor_data *p, struct event *event, struct result *result)
+{
+	save_buffer(p, p->file_path);
+}
+
+// TODO: Put all events declared at events.h here, pointing to an empty function if
+// necessary, to prevent segmentation faults.
+static void (*event_handler_table[])
+(struct single_buffer_editor_data *p, struct event *event, struct result *result) = {
+	[EVENT_SAVE_BUFFER] = handle_event_save_buffer,
+	[EVENT_SHOW_CURSOR] = handle_event_show_cursor,
+	[EVENT_HIDE_CURSOR] = handle_event_hide_cursor,
+	[EVENT_MOVE_CURSOR_LEFT] = handle_event_move_cursor_left,
+	[EVENT_MOVE_CURSOR_RIGHT] = handle_event_move_cursor_right,
+	[EVENT_MOVE_CURSOR_UP] = handle_event_move_cursor_up,
+	[EVENT_MOVE_CURSOR_DOWN] = handle_event_move_cursor_down,
+	[EVENT_CHARACTER_ENTERED] = handle_event_character_entered,
+	[EVENT_DELETE_KEY_ENTERED] = handle_event_delete_key_entered
+};
+
+//---------------------------------------------------------------------------------------//
+
 // Functions that implement the editor_object interface defined at common/interface.h
 
 static int init_single_buffer_editor(struct editor_object *self, const char *path, int nlines, int ncols, int y, int x)
@@ -497,50 +576,18 @@ static void uninit_single_buffer_editor(struct editor_object *self)
 	free(p->file_path);
 }
 
-// TODO: split switch in functions
-static int single_buffer_editor_handle_event(struct editor_object *self, struct event *event)
+static void single_buffer_editor_handle_event
+(struct editor_object *self, struct event *event, struct result *result)
 {
 	struct single_buffer_editor_data *p = (struct single_buffer_editor_data *)self->data;
-	// TODO: Better name for this
-	char user_entered_character;
 
-	//TODO: Use a jump table here
-	switch (event->event_type) {
-		case EVENT_SHOW_CURSOR:
-			show_cursor(p);
-		break;
-		case EVENT_HIDE_CURSOR:
-			hide_cursor(p);
-		break;
-		case EVENT_MOVE_CURSOR_LEFT:
-			move_cursor_left(p);
-		break;
-		case EVENT_MOVE_CURSOR_RIGHT:
-			move_cursor_right(p);
-		break;
-		case EVENT_MOVE_CURSOR_UP:
-			move_cursor_up(p);
-		break;
-		case EVENT_MOVE_CURSOR_DOWN:
-			move_cursor_down(p);
-		break;
-		case EVENT_DELETE_KEY_ENTERED:
-			remove_current_character(p);
-		break;
-		case EVENT_CHARACTER_ENTERED:
-			user_entered_character = *((char *)event->additional_data);
-			if (user_entered_character == '\n')
-				insert_new_line(p);
-			else
-				put_character(p, (char *)event->additional_data);
-		break;
-		case EVENT_SAVE_BUFFER:
-			save_buffer(p, p->file_path);
-		break;
-		default:
-			return ERROR_EVENT_NOT_FOUND;
+	if (event->event_type <= NR_EVENTS) {
+		// the event handler may override this
+		result->result_type = EVENT_HANDLING_SUCCESS;
+		event_handler_table[event->event_type](p, event, result);
 	}
-	return EVENT_HANDLING_SUCCESS;
+	else
+		result->result_type = ERROR_EVENT_NOT_FOUND;
 }
 
 // TODO: Don't refresh the full window all the time

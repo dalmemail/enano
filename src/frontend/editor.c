@@ -54,8 +54,10 @@ void run_editor(char *path)
 		goto out;
 	}
 	struct event reusable_event;
+	struct result reusable_result;
 	int exit = 0;
 	editor.refresh_(&editor);
+	// TODO: Use jump table here
 	while (!exit) {
 		reusable_event.event_type = EVENT_VOID;
 		int c = wgetch(upper_bar_window);
@@ -89,8 +91,10 @@ void run_editor(char *path)
 					reusable_event.additional_data = (void *)&c;
 				}
 		}
-		editor.handle_event(&editor, &reusable_event);
-		editor.refresh_(&editor);
+		if (!exit) {
+			editor.handle_event(&editor, &reusable_event, &reusable_result);
+			editor.refresh_(&editor);
+		}
 	}
 	editor.uninit(&editor);
 out:	endwin();

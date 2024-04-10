@@ -30,7 +30,7 @@ struct editor_object {
 	void *data;
 	int (*init)(struct editor_object *, const char *, int, int, int, int);
 	void (*uninit)(struct editor_object *);
-	int (*handle_event)(struct editor_object *, struct event *);
+	void (*handle_event)(struct editor_object *, struct event *, struct result *);
 	// ncurses defines a macro called refresh(), so we can't use that name
 	void (*refresh_)(struct editor_object *);
 };
