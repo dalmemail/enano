@@ -491,6 +491,7 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	p->window = newwin(nlines, ncols, y, x);
 	// TODO: Improve this
 	if (!p->window) {
+		free(p);
 		return EFAULT;
 	}
 
@@ -499,6 +500,7 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	FILE *file_descriptor = fopen(path, "r");
 	if (!file_descriptor) {
 		delwin(p->window);
+		free(p);
 		return errno;
 	}
 
@@ -506,6 +508,7 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	if (stat(path, &st) < 0) {
 		delwin(p->window);
 		fclose(file_descriptor);
+		free(p);
 		return errno;
 	}
 
@@ -514,6 +517,7 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	if (p->file_path == NULL) {
 		delwin(p->window);
 		fclose(file_descriptor);
+		free(p);
 		return errno;
 	}
 	strncpy(p->file_path, path, path_size);
@@ -525,6 +529,7 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	if (buffer == NULL) {
 		delwin(p->window);
 		fclose(file_descriptor);
+		free(p);
 		return errno;
 	}
 
@@ -534,6 +539,7 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 		free(buffer);
 		// TODO: put here another error code
 		// DONT RETURN -1: You have to return something in the 0..255 range
+		free(p);
 		return -1;
 	}
 	fclose(file_descriptor);
@@ -543,6 +549,7 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	if (p->lines == NULL) {
 		delwin(p->window);
 		free(buffer);
+		free(p);
 		return errno;
 	}
 
@@ -558,7 +565,7 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	p->top_print_line = p->lines;
 	p->top_print_line_y = 0;
 
-	//TODO: Checks this
+	//TODO: Check this
 	return 0;
 }
 
