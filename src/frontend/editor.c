@@ -16,12 +16,15 @@
 
 #include <curses.h>
 
+#include <stdio.h>
+#include <string.h>
+
 #include <backend/single_buffer_editor.h>
 #include <common/events.h>
 
 #define ctrl(x)           ((x) & 0x1f)
 
-// TODO: Put upper and (future) lower bar in different files
+// TODO: Put upper and lower bar in different files
 static void draw_upper_bar(WINDOW *window)
 {
         wbkgd(window, COLOR_PAIR(1));
@@ -50,8 +53,11 @@ void run_editor(char *path)
 	draw_upper_bar(upper_bar_window);
 	wrefresh(upper_bar_window);
 	struct editor_object editor = single_buffer_editor_object;
-	if (editor.init(&editor, path, LINES - 1, COLS, 1, 0) != 0) {
-		goto out;
+	int retval = editor.init(&editor, path, LINES - 1, COLS, 1, 0);
+	if (retval < 0) {
+		endwin();
+		printf("Critical error at editor.init(): %s\n", strerror(-retval));
+		return;
 	}
 	struct event reusable_event;
 	struct result reusable_result;
@@ -97,5 +103,5 @@ void run_editor(char *path)
 		}
 	}
 	editor.uninit(&editor);
-out:	endwin();
+	endwin();
 }

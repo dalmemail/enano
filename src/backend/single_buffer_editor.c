@@ -482,43 +482,38 @@ static void (*event_handler_table[])
 
 static int init_single_buffer_editor(struct editor_object *self, const char *path, int nlines, int ncols, int y, int x)
 {
+	int ret = 0;
 	struct single_buffer_editor_data *p = (struct single_buffer_editor_data *)malloc(sizeof(struct single_buffer_editor_data));
 	if (p == NULL)
-		return EINVAL;
+		return -errno;
 
 	self->data = (void *)p;
 
 	p->window = newwin(nlines, ncols, y, x);
-	// TODO: Improve this
 	if (!p->window) {
-		free(p);
-		return EFAULT;
+		ret = -EFAULT;
+		goto err_creating_window;
 	}
 
 	p->window_nlines = nlines;
 	p->window_ncols = ncols;
 	FILE *file_descriptor = fopen(path, "r");
 	if (!file_descriptor) {
-		delwin(p->window);
-		free(p);
-		return errno;
+		ret = -errno;
+		goto err_opening_file;
 	}
 
 	struct stat st;
 	if (stat(path, &st) < 0) {
-		delwin(p->window);
-		fclose(file_descriptor);
-		free(p);
-		return errno;
+		ret = -errno;
+		goto err_stating_file;
 	}
 
 	size_t path_size = strlen(path) + 1;
 	p->file_path = (char *)malloc(path_size * sizeof(char));
 	if (p->file_path == NULL) {
-		delwin(p->window);
-		fclose(file_descriptor);
-		free(p);
-		return errno;
+		ret = -errno;
+		goto err_malloc_path_size;
 	}
 	strncpy(p->file_path, path, path_size);
 
@@ -527,30 +522,20 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	buffer_size = st.st_size;
 	buffer = (char *)malloc(buffer_size * sizeof(char));
 	if (buffer == NULL) {
-		delwin(p->window);
-		fclose(file_descriptor);
-		free(p);
-		return errno;
+		ret = -errno;
+		goto err_malloc_buffer;
 	}
 
 	if (fread(buffer, buffer_size, 1, file_descriptor) != 1) {
-		delwin(p->window);
-		fclose(file_descriptor);
-		free(buffer);
-		// TODO: put here another error code
-		// DONT RETURN -1: You have to return something in the 0..255 range
-		free(p);
-		return -1;
+		ret = -EBADFD;
+		goto err_fread;
 	}
-	fclose(file_descriptor);
 
 	p->n_lines = count_lines(buffer, buffer_size);
 	p->lines = (struct line_linked_list_node *)malloc(sizeof(struct line_linked_list_node));
 	if (p->lines == NULL) {
-		delwin(p->window);
-		free(buffer);
-		free(p);
-		return errno;
+		ret = -errno;
+		goto err_malloc_p_lines;
 	}
 
 	split_in_lines(buffer, p->n_lines, p->lines);
@@ -565,8 +550,23 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	p->top_print_line = p->lines;
 	p->top_print_line_y = 0;
 
-	//TODO: Check this
+	fclose(file_descriptor);
+
 	return 0;
+
+err_malloc_p_lines:
+err_fread:
+	free(buffer);
+err_malloc_buffer:
+	free(p->file_path);
+err_malloc_path_size:
+err_stating_file:
+	fclose(file_descriptor);
+err_opening_file:
+	delwin(p->window);
+err_creating_window:
+	free(p);
+	return ret;
 }
 
 static void uninit_single_buffer_editor(struct editor_object *self)
