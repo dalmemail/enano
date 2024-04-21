@@ -518,8 +518,7 @@ static int init_single_buffer_editor(struct editor_object *self, const char *pat
 	strncpy(p->file_path, path, path_size);
 
 	char *buffer;
-	size_t buffer_size;
-	buffer_size = st.st_size;
+	size_t buffer_size = st.st_size;
 	buffer = (char *)malloc(buffer_size * sizeof(char));
 	if (buffer == NULL) {
 		ret = -errno;
